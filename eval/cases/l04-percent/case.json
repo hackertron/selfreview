@@ -1,0 +1,19 @@
+{
+  "id": "l04-percent",
+  "category": "logic",
+  "title": "Coupons",
+  "description": "Supports percentage coupons on line items.",
+  "bug": {
+    "path": "src/pricing.ts",
+    "snippets": [
+      "return Math.round(gross - gross * coupon.percentOff);"
+    ],
+    "summary": "percentOff=15 multiplies by 15 instead of 0.15: totals go hugely negative"
+  },
+  "files": [
+    {
+      "path": "src/pricing.ts",
+      "isNew": false
+    }
+  ]
+}

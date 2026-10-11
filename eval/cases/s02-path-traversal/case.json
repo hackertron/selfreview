@@ -1,0 +1,19 @@
+{
+  "id": "s02-path-traversal",
+  "category": "security",
+  "title": "Download a single upload",
+  "description": "Adds GET /files/:name to download one of the user's uploads.",
+  "bug": {
+    "path": "src/routes/files.ts",
+    "snippets": [
+      "const filePath = path.join(UPLOAD_DIR"
+    ],
+    "summary": "file name from the URL joined into a path without containment check (path traversal)"
+  },
+  "files": [
+    {
+      "path": "src/routes/files.ts",
+      "isNew": false
+    }
+  ]
+}

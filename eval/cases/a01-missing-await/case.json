@@ -1,0 +1,19 @@
+{
+  "id": "a01-missing-await",
+  "category": "async",
+  "title": "Audit project deletion",
+  "description": "Writes an audit log entry when a project is deleted.",
+  "bug": {
+    "path": "src/projects.ts",
+    "snippets": [
+      "saveAuditLog({ action: \"project.delete\""
+    ],
+    "summary": "saveAuditLog isn't awaited: failures escape the try/catch as unhandled rejections"
+  },
+  "files": [
+    {
+      "path": "src/projects.ts",
+      "isNew": false
+    }
+  ]
+}

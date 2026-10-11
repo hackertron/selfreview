@@ -1,0 +1,19 @@
+{
+  "id": "s08-secret-logging",
+  "category": "security",
+  "title": "Log request headers for debugging",
+  "description": "Adds request headers to the access log to debug a proxy issue.",
+  "bug": {
+    "path": "src/middleware/logging.ts",
+    "snippets": [
+      "headers: Object.fromEntries(c.req.raw.headers),"
+    ],
+    "summary": "logs all headers, including Authorization and cookies (secrets in logs)"
+  },
+  "files": [
+    {
+      "path": "src/middleware/logging.ts",
+      "isNew": false
+    }
+  ]
+}

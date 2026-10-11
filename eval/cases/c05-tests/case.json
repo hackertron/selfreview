@@ -1,0 +1,13 @@
+{
+  "id": "c05-tests",
+  "category": "clean",
+  "title": "Tests for slugify",
+  "description": "Adds unit tests for the existing slugify helper.",
+  "bug": null,
+  "files": [
+    {
+      "path": "tests/slug.test.ts",
+      "isNew": true
+    }
+  ]
+}

@@ -1,0 +1,20 @@
+{
+  "id": "a04-client-leak",
+  "category": "async",
+  "title": "Statement timeout for reports",
+  "description": "Reports now run with a 5 s statement timeout.",
+  "bug": {
+    "path": "src/db/report.ts",
+    "snippets": [
+      "const client = await pool.connect();",
+      "client.release();"
+    ],
+    "summary": "client isn't released if a query throws (no try/finally): the pool leaks connections"
+  },
+  "files": [
+    {
+      "path": "src/db/report.ts",
+      "isNew": false
+    }
+  ]
+}

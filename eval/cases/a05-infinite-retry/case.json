@@ -1,0 +1,20 @@
+{
+  "id": "a05-infinite-retry",
+  "category": "async",
+  "title": "Retry webhook notifications",
+  "description": "Retries outgoing webhook notifications until they succeed.",
+  "bug": {
+    "path": "src/notify.ts",
+    "snippets": [
+      "while (true) {",
+      "// network error: try again"
+    ],
+    "summary": "retries forever with no delay or limit: a dead endpoint spins forever"
+  },
+  "files": [
+    {
+      "path": "src/notify.ts",
+      "isNew": false
+    }
+  ]
+}

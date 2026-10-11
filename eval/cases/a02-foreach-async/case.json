@@ -1,0 +1,19 @@
+{
+  "id": "a02-foreach-async",
+  "category": "async",
+  "title": "Speed up contact import",
+  "description": "Imports contacts in parallel instead of one by one.",
+  "bug": {
+    "path": "src/import.ts",
+    "snippets": [
+      "valid.forEach(async (row) => {"
+    ],
+    "summary": "forEach doesn't await async callbacks: returns before writes finish, errors are lost"
+  },
+  "files": [
+    {
+      "path": "src/import.ts",
+      "isNew": false
+    }
+  ]
+}

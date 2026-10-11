@@ -1,0 +1,19 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" width="512" height="512">
+  <title>Selfreview</title>
+  <defs>
+    <linearGradient id="bg" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#4433A3"/>
+      <stop offset="1" stop-color="#2E2478"/>
+    </linearGradient>
+  </defs>
+  <!-- full-bleed square: GitHub and Railway round the corners themselves -->
+  <rect width="512" height="512" fill="url(#bg)"/>
+  <g fill="none" stroke="#FFFFFF" stroke-width="30" stroke-linecap="round" stroke-linejoin="round">
+    <!-- roof: "hosted at your place" -->
+    <path d="M110 232 L256 108 L402 232"/>
+    <!-- walls that end in a speech-bubble tail: "a review comment" -->
+    <path d="M150 204 V372 H206 L182 428 L258 372 H362 V204"/>
+    <!-- check: "reviewed" -->
+    <path d="M204 290 L242 326 L312 252"/>
+  </g>
+</svg>

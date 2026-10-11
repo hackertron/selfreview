@@ -1,0 +1,19 @@
+{
+  "id": "s07-ssrf",
+  "category": "security",
+  "title": "Link previews",
+  "description": "Adds GET /preview?url= that returns the page title for link previews.",
+  "bug": {
+    "path": "src/routes/preview.ts",
+    "snippets": [
+      "const res = await fetch(url, {"
+    ],
+    "summary": "server fetches any user-supplied URL, including internal addresses (SSRF)"
+  },
+  "files": [
+    {
+      "path": "src/routes/preview.ts",
+      "isNew": true
+    }
+  ]
+}

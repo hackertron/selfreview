@@ -1,0 +1,19 @@
+{
+  "id": "l02-inverted-flag",
+  "category": "logic",
+  "title": "Roll out the new checkout behind a flag",
+  "description": "Use the new checkout for users with the `new-checkout` flag.",
+  "bug": {
+    "path": "src/checkout.ts",
+    "snippets": [
+      "if (!flags.isEnabled(\"new-checkout\", user.id)) {"
+    ],
+    "summary": "flag check is inverted: everyone WITHOUT the flag gets the new checkout"
+  },
+  "files": [
+    {
+      "path": "src/checkout.ts",
+      "isNew": false
+    }
+  ]
+}

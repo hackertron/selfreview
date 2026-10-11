@@ -1,0 +1,13 @@
+{
+  "id": "c04-request-id-logging",
+  "category": "clean",
+  "title": "Log request ids",
+  "description": "Adds the x-request-id header to access logs so we can trace requests.",
+  "bug": null,
+  "files": [
+    {
+      "path": "src/middleware/logging.ts",
+      "isNew": false
+    }
+  ]
+}

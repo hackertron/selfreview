@@ -1,0 +1,19 @@
+{
+  "id": "s03-idor",
+  "category": "security",
+  "title": "Fetch one invoice",
+  "description": "Adds GET /invoices/:id so the dashboard can show invoice details.",
+  "bug": {
+    "path": "src/routes/invoices.ts",
+    "snippets": [
+      "const invoice = await db.invoice.findUnique"
+    ],
+    "summary": "invoice fetched by id without checking it belongs to the caller's org (IDOR)"
+  },
+  "files": [
+    {
+      "path": "src/routes/invoices.ts",
+      "isNew": false
+    }
+  ]
+}

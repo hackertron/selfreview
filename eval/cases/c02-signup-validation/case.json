@@ -1,0 +1,13 @@
+{
+  "id": "c02-signup-validation",
+  "category": "clean",
+  "title": "Validate sign-up input",
+  "description": "Rejects malformed sign-ups with a 400 instead of failing deeper in.",
+  "bug": null,
+  "files": [
+    {
+      "path": "src/routes/signup.ts",
+      "isNew": false
+    }
+  ]
+}

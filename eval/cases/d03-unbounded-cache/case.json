@@ -1,0 +1,20 @@
+{
+  "id": "d03-unbounded-cache",
+  "category": "performance",
+  "title": "Cache IP lookups",
+  "description": "Caches geo lookups so we don't call the provider for every request.",
+  "bug": {
+    "path": "src/geo.ts",
+    "snippets": [
+      "const cache = new Map<string, GeoResult>();",
+      "cache.set(ip, result);"
+    ],
+    "summary": "cache keyed by every client IP never evicts: memory grows without bound"
+  },
+  "files": [
+    {
+      "path": "src/geo.ts",
+      "isNew": false
+    }
+  ]
+}

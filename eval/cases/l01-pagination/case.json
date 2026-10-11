@@ -1,0 +1,19 @@
+{
+  "id": "l01-pagination",
+  "category": "logic",
+  "title": "Paginate the post list",
+  "description": "Replaces the fixed 50 newest posts with `?page=` pagination (pages start at 1).",
+  "bug": {
+    "path": "src/routes/posts.ts",
+    "snippets": [
+      "skip: page * PAGE_SIZE,"
+    ],
+    "summary": "pages start at 1 but skip = page * size, so page 1 skips the first 20 posts"
+  },
+  "files": [
+    {
+      "path": "src/routes/posts.ts",
+      "isNew": false
+    }
+  ]
+}

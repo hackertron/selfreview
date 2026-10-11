@@ -1,0 +1,19 @@
+{
+  "id": "l03-python-is",
+  "category": "logic",
+  "title": "Optionally include trials",
+  "description": "Lets callers include trialing subscriptions.",
+  "bug": {
+    "path": "app/subscriptions.py",
+    "snippets": [
+      "if s.status is \"active\":"
+    ],
+    "summary": "`is` compares identity, not string equality; active subs can be missed"
+  },
+  "files": [
+    {
+      "path": "app/subscriptions.py",
+      "isNew": false
+    }
+  ]
+}

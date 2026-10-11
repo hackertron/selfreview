@@ -1,0 +1,19 @@
+{
+  "id": "d06-timezone",
+  "category": "data",
+  "title": "Daily streaks per user",
+  "description": "Adds the helper that decides which day a user's activity counts for.",
+  "bug": {
+    "path": "src/streaks.ts",
+    "snippets": [
+      "return new Date().toISOString().slice(0, 10);"
+    ],
+    "summary": "uses the UTC date and ignores user.timeZone, so streaks break around midnight"
+  },
+  "files": [
+    {
+      "path": "src/streaks.ts",
+      "isNew": true
+    }
+  ]
+}

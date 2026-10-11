@@ -1,0 +1,20 @@
+{
+  "id": "d05-swallowed-error",
+  "category": "data",
+  "title": "Don't crash the checkout on capture errors",
+  "description": "Logs capture failures instead of throwing.",
+  "bug": {
+    "path": "src/payments.ts",
+    "snippets": [
+      "log.warn(\"capture failed\"",
+      "return { ok: true };"
+    ],
+    "summary": "a failed capture still returns ok: true, so unpaid orders look successful"
+  },
+  "files": [
+    {
+      "path": "src/payments.ts",
+      "isNew": false
+    }
+  ]
+}

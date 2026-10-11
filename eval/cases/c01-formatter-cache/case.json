@@ -1,0 +1,13 @@
+{
+  "id": "c01-formatter-cache",
+  "category": "clean",
+  "title": "Reuse number formatters",
+  "description": "Creating Intl.NumberFormat is slow; reuse one per currency.",
+  "bug": null,
+  "files": [
+    {
+      "path": "src/format.ts",
+      "isNew": false
+    }
+  ]
+}

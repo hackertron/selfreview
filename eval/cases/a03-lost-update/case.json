@@ -1,0 +1,20 @@
+{
+  "id": "a03-lost-update",
+  "category": "async",
+  "title": "Use the ORM for stock reservation",
+  "description": "Replaces raw SQL with the ORM API for readability.",
+  "bug": {
+    "path": "src/inventory.ts",
+    "snippets": [
+      "const product = await db.product.findUniqueOrThrow",
+      "data: { stock: product.stock - qty }"
+    ],
+    "summary": "read-then-write is no longer atomic: concurrent reservations oversell stock"
+  },
+  "files": [
+    {
+      "path": "src/inventory.ts",
+      "isNew": false
+    }
+  ]
+}

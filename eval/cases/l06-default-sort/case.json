@@ -1,0 +1,19 @@
+{
+  "id": "l06-default-sort",
+  "category": "logic",
+  "title": "Simplify topScores",
+  "description": "Small cleanup of the leaderboard helper.",
+  "bug": {
+    "path": "src/leaderboard.ts",
+    "snippets": [
+      "return [...scores].sort().reverse().slice(0, n);"
+    ],
+    "summary": "sort() without comparator sorts numbers as strings (100 < 9)"
+  },
+  "files": [
+    {
+      "path": "src/leaderboard.ts",
+      "isNew": false
+    }
+  ]
+}

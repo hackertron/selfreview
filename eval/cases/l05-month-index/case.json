@@ -1,0 +1,19 @@
+{
+  "id": "l05-month-index",
+  "category": "logic",
+  "title": "Monthly revenue report",
+  "description": "Adds revenue for a calendar month for the dashboard (month is 1-12).",
+  "bug": {
+    "path": "src/reports.ts",
+    "snippets": [
+      "const start = new Date(Date.UTC(year, month, 1));"
+    ],
+    "summary": "JS months are 0-based; passing 1-12 reports the following month"
+  },
+  "files": [
+    {
+      "path": "src/reports.ts",
+      "isNew": true
+    }
+  ]
+}

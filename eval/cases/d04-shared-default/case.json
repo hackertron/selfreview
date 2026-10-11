@@ -1,0 +1,19 @@
+{
+  "id": "d04-shared-default",
+  "category": "data",
+  "title": "Authenticated API calls",
+  "description": "apiFetch now sends the caller's token.",
+  "bug": {
+    "path": "src/http.ts",
+    "snippets": [
+      "init.headers.authorization = `Bearer ${token}`;"
+    ],
+    "summary": "mutates the shared DEFAULTS object: one user's token leaks into other calls"
+  },
+  "files": [
+    {
+      "path": "src/http.ts",
+      "isNew": false
+    }
+  ]
+}

@@ -1,0 +1,19 @@
+{
+  "id": "s01-sql-injection",
+  "category": "security",
+  "title": "Search users by name",
+  "description": "Adds an optional `search` filter to the user list.",
+  "bug": {
+    "path": "app/users.py",
+    "snippets": [
+      "query += f\" AND name ILIKE '%{search}%'\""
+    ],
+    "summary": "user input interpolated into SQL (SQL injection)"
+  },
+  "files": [
+    {
+      "path": "app/users.py",
+      "isNew": false
+    }
+  ]
+}

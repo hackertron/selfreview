@@ -1,0 +1,3 @@
+# Test discovery stays in tests/ (eval/cases contains fixture code, including a fixture test file).
+[test]
+root = "./tests"

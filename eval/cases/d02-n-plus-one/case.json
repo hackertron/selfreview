@@ -1,0 +1,19 @@
+{
+  "id": "d02-n-plus-one",
+  "category": "performance",
+  "title": "Show customer names on orders",
+  "description": "The order list now includes each customer's name.",
+  "bug": {
+    "path": "src/routes/orders.ts",
+    "snippets": [
+      "const customer = await db.customer.findUnique"
+    ],
+    "summary": "one query per order (N+1): 100 sequential queries per request"
+  },
+  "files": [
+    {
+      "path": "src/routes/orders.ts",
+      "isNew": false
+    }
+  ]
+}

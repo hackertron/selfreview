@@ -1,0 +1,19 @@
+{
+  "id": "s04-timing-compare",
+  "category": "security",
+  "title": "Verify payment webhooks",
+  "description": "Adds signature verification for incoming payment webhooks.",
+  "bug": {
+    "path": "src/webhooks/verify.ts",
+    "snippets": [
+      "return signature === expected;"
+    ],
+    "summary": "HMAC compared with === (timing attack); should be constant-time"
+  },
+  "files": [
+    {
+      "path": "src/webhooks/verify.ts",
+      "isNew": true
+    }
+  ]
+}

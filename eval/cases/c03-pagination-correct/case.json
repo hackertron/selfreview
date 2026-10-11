@@ -1,0 +1,13 @@
+{
+  "id": "c03-pagination-correct",
+  "category": "clean",
+  "title": "Paginate comments",
+  "description": "Adds `?page=` pagination to comments (pages start at 1).",
+  "bug": null,
+  "files": [
+    {
+      "path": "src/routes/comments.ts",
+      "isNew": false
+    }
+  ]
+}

@@ -1,0 +1,19 @@
+{
+  "id": "s06-jwt-decode",
+  "category": "security",
+  "title": "Accept tokens from the mobile app",
+  "description": "The mobile app sends tokens issued by our auth service; accept them when `x-client: mobile`.",
+  "bug": {
+    "path": "src/middleware/auth.ts",
+    "snippets": [
+      "(isMobile ? decode(token) : verify(token, SECRET))"
+    ],
+    "summary": "mobile tokens are decoded without signature verification (auth bypass)"
+  },
+  "files": [
+    {
+      "path": "src/middleware/auth.ts",
+      "isNew": false
+    }
+  ]
+}

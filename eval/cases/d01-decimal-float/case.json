@@ -1,0 +1,20 @@
+{
+  "id": "d01-decimal-float",
+  "category": "data",
+  "title": "Add sales tax",
+  "description": "Adds 8.25% sales tax to taxable invoices.",
+  "bug": {
+    "path": "app/billing.py",
+    "snippets": [
+      "TAX_RATE = 0.0825",
+      "total = total * TAX_RATE + total"
+    ],
+    "summary": "Decimal * float raises TypeError (and floats don't belong in money math)"
+  },
+  "files": [
+    {
+      "path": "app/billing.py",
+      "isNew": false
+    }
+  ]
+}

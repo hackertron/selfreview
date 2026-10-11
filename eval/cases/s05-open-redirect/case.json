@@ -1,0 +1,19 @@
+{
+  "id": "s05-open-redirect",
+  "category": "security",
+  "title": "Return to the page you came from after login",
+  "description": "After logging in, send the user back to `?next=` instead of always the dashboard.",
+  "bug": {
+    "path": "src/routes/auth.ts",
+    "snippets": [
+      "return c.redirect(next ?? \"/dashboard\");"
+    ],
+    "summary": "redirects to an unvalidated `next` URL (open redirect)"
+  },
+  "files": [
+    {
+      "path": "src/routes/auth.ts",
+      "isNew": false
+    }
+  ]
+}
