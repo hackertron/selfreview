@@ -481,4 +481,7 @@ Bigger PRs cost more (they're chunked); `MAX_REVIEW_COST_USD` and `MONTHLY_BUDGE
 - Final review fixes: `railway.ts` no longer derives secrets with `ctx.randomString()` (predictable), a failed review's billed calls now count against the monthly budget, an attempt that runs past its time limit stops before posting, and the login redirect accepts only paths on this site.
 - Dogfood review (Selfreview reviewing its own code, $0.03): the login page now refuses logins for 15 minutes after 10 wrong passwords, and the benchmark errors out when a case's bug snippet is missing instead of silently scoring it as missed.
 
+**v1.0.2 (2026-10-12): one-click suggestions**
+- Models often copied the line after the flagged one into a suggestion, so accepting it added that line twice. Lines copied from just before or after the range are now removed, and a suggestion that would change nothing is dropped.
+
 **v0.1 (2026-10-08)**: first draft.

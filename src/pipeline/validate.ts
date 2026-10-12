@@ -74,6 +74,7 @@ export function validateFindings(
       result.dropped.push({ finding: f, reason: "max_comments reached" });
       continue;
     }
+    if (f.suggestion) f = { ...f, suggestion: dropCopiedLines(f.suggestion, f, diff) };
     const suggestion = safeSuggestion(f, diff) ? f.suggestion : undefined;
     seen.add(fp);
     result.post.push({ ...f, suggestion, fingerprint: fp });
@@ -93,12 +94,46 @@ export function safeSuggestion(f: Finding, diff: FileDiff): boolean {
   const end = f.end_line ?? f.line;
   if (end < f.line || end - f.line >= 6) return false;
   const kept = new Set(f.suggestion.split("\n").map((l) => l.trim()));
+  const replaced: string[] = [];
   for (let n = f.line; n <= end; n++) {
     const original = diff.commentable.get(n);
     if (original === undefined) return false;
     if (original.trim() && !kept.has(original.trim())) return false;
+    replaced.push(original.trim());
   }
+  // Accepting it would change nothing.
+  const proposed = f.suggestion.split("\n").map((l) => l.trim());
+  if (proposed.join("\n") === replaced.join("\n")) return false;
   return true;
+}
+
+/**
+ * Models often copy a few lines from just before or after the range into the suggestion, and
+ * accepting it would then add those lines a second time (seen at launch: the fix for a missing
+ * admin check repeated the line after the route). Remove such copies. A copy made only of
+ * brackets stays, since a lone "}" is often new code that closes a block the suggestion opened.
+ */
+export function dropCopiedLines(suggestion: string, f: Finding, diff: FileDiff): string {
+  const lines = suggestion.split("\n");
+  const end = f.end_line ?? f.line;
+  const matches = (text: string, n: number) => diff.commentable.get(n)?.trim() === text.trim();
+  const hasCode = (run: string[]) => run.some((text) => /[A-Za-z0-9]/.test(text));
+
+  // The last k lines repeat the k lines after the range.
+  let tail = 0;
+  for (let k = 1; k < lines.length; k++) {
+    const run = lines.slice(lines.length - k);
+    if (hasCode(run) && run.every((text, i) => matches(text, end + 1 + i))) tail = k;
+  }
+
+  // The first k lines repeat the k lines before the range.
+  let head = 0;
+  for (let k = 1; k < lines.length - tail; k++) {
+    const run = lines.slice(0, k);
+    if (hasCode(run) && run.every((text, i) => matches(text, f.line - k + i))) head = k;
+  }
+
+  return lines.slice(head, lines.length - tail).join("\n");
 }
 
 const MAX_COMMENT_RANGE = 30;

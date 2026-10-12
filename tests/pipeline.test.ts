@@ -8,7 +8,14 @@ import { parsePatch } from "../src/pipeline/diff";
 import { filterFiles } from "../src/pipeline/filter";
 import { parseRenderedComment, renderComment, renderSummary } from "../src/pipeline/render";
 import { parseRepoConfig, skipReason } from "../src/pipeline/repo-config";
-import { fingerprint, rangeInDiff, safeSuggestion, sanitize, validateFindings } from "../src/pipeline/validate";
+import {
+  dropCopiedLines,
+  fingerprint,
+  rangeInDiff,
+  safeSuggestion,
+  sanitize,
+  validateFindings,
+} from "../src/pipeline/validate";
 
 const PATCH = `@@ -1,4 +1,6 @@
  export function add(a: number, b: number) {
@@ -217,6 +224,35 @@ describe("suggestions (accepting one replaces the lines)", () => {
   });
   test("dropped when it contains a code fence (it would break out of the suggestion block)", () => {
     expect(safeSuggestion(f("this.links.set(slug, link);\n```\n![x](https://evil.example/t.png)"), diff)).toBe(false);
+  });
+  test("dropped when accepting it would change nothing", () => {
+    expect(safeSuggestion(f("this.links.set(slug, link);"), diff)).toBe(false);
+  });
+});
+
+describe("suggestions that copy the lines around them", () => {
+  const diff = parsePatch(
+    "@@ -1,2 +1,4 @@\n const link = make();\n+if (link) {\n+this.links.set(slug, link);\n+}\n return link;",
+  );
+  const f = (line: number, suggestion: string): Finding => ({ ...finding({ path: "a.ts", line }), suggestion });
+
+  test("lines copied from after the range are removed, so accepting it doesn't add them twice", () => {
+    const copied = "this.links.set(slug, link);\nlog(slug);\n}\nreturn link;";
+    expect(dropCopiedLines(copied, f(3, copied), diff)).toBe("this.links.set(slug, link);\nlog(slug);");
+  });
+  test("lines copied from before the range are removed too", () => {
+    const copied = "const link = make();\nif (link && slug) {";
+    expect(dropCopiedLines(copied, f(2, copied), diff)).toBe("if (link && slug) {");
+  });
+  test("a closing bracket that matches the next line stays (it can be new code)", () => {
+    const wrapped = "if (slug) {\nthis.links.set(slug, link);\n}";
+    expect(dropCopiedLines(wrapped, f(3, wrapped), diff)).toBe(wrapped);
+  });
+  test("the whole pipeline posts the trimmed suggestion", () => {
+    const copied = "this.links.set(slug, link);\nlog(slug);\n}\nreturn link;";
+    const opts = { minSeverity: "medium" as const, maxComments: 10 };
+    const r = validateFindings([f(3, copied)], new Map([["a.ts", diff]]), [], opts);
+    expect(r.post[0]?.suggestion).toBe("this.links.set(slug, link);\nlog(slug);");
   });
 });
 
