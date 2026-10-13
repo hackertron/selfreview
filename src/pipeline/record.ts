@@ -103,6 +103,17 @@ export async function alreadyReviewed(pool: Pool, repo: string, pr: number, sha:
   return (rowCount ?? 0) > 0;
 }
 
+/** The newest commit of this PR that was reviewed successfully, if any (for incremental reviews). */
+export async function lastReviewedSha(pool: Pool, repo: string, pr: number): Promise<string | null> {
+  const { rows } = await pool.query(
+    `SELECT head_sha FROM reviews
+     WHERE repo = $1 AND pr = $2 AND status IN ('posted', 'no_new_findings')
+     ORDER BY created_at DESC LIMIT 1`,
+    [repo, pr],
+  );
+  return (rows[0]?.head_sha as string | undefined) ?? null;
+}
+
 /** Findings already posted on this PR, for dedupe across pushes. */
 export async function priorFindings(pool: Pool, repo: string, pr: number) {
   const { rows } = await pool.query(

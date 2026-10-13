@@ -38,6 +38,7 @@ export function renderReviewBody(sha: string, count: number): string {
 
 export type SummaryData = {
   sha: string;
+  since?: string; // incremental review: only the changes after this commit were reviewed
   posted: ValidatedFinding[];
   outsideDiff: Finding[];
   skippedFiles: { path: string; reason: string }[];
@@ -70,7 +71,9 @@ export function renderSummary(d: SummaryData): string {
       .map(([s, c]) => `${c} ${s}`)
       .join(", ");
     lines.push(
-      `Reviewed \`${d.sha.slice(0, 7)}\` · ${d.filesReviewed} ${d.filesReviewed === 1 ? "file" : "files"} · ` +
+      `Reviewed \`${d.sha.slice(0, 7)}\`` +
+        (d.since ? ` (changes since \`${d.since.slice(0, 7)}\`)` : "") +
+        ` · ${d.filesReviewed} ${d.filesReviewed === 1 ? "file" : "files"} · ` +
         (n ? `**${n} new ${n === 1 ? "finding" : "findings"}** (${bySeverity})` : "no new findings") +
         ` · \`${d.model}\` · $${d.costUsd.toFixed(4)}`,
     );

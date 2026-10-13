@@ -3,6 +3,7 @@
 import type { PgBoss } from "pg-boss";
 import type { Pool } from "../db/pool";
 import { REVIEW_QUEUE, type ReviewJob } from "../queue";
+import type { UpdateInfo } from "./updates";
 
 export type DashboardData = {
   month: { spentUsd: number; reviews: number; posted: number; findings: number; budgetUsd?: number };
@@ -14,6 +15,7 @@ export type DashboardData = {
   installations: { account: string; accountType: string; repoCount: number | null; installedAt: Date; removedAt: Date | null }[];
   deliveries: { receivedAt: Date; event: string; action: string | null; outcome: string }[];
   failedJobs: { id: string; repo: string; pr: number; failedAt: Date | null; error: string }[];
+  update?: UpdateInfo | null; // filled in by the api, not loaded from the database
 };
 
 export async function loadDashboard(pool: Pool, boss: PgBoss, budgetUsd?: number): Promise<DashboardData> {

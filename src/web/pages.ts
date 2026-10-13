@@ -3,6 +3,7 @@
 import { html, raw } from "hono/html";
 import type { HtmlEscapedString } from "hono/utils/html";
 import type { DashboardData } from "./dashboard-data";
+import type { UpdateInfo } from "./updates";
 
 type Html = HtmlEscapedString | Promise<HtmlEscapedString>;
 
@@ -23,6 +24,7 @@ function layout(title: string, body: Html, opts: { wide?: boolean } = {}) {
   main { max-width: 560px; margin: 48px auto; padding: 0 16px; }
   header { display: flex; align-items: center; gap: 12px; margin-bottom: 24px; font-weight: 600; font-size: 20px; }
   .card { background: var(--card); border: 1px solid var(--border); border-radius: 12px; padding: 24px; }
+  .card.notice { border-color: var(--accent); }
   h1 { font-size: 22px; margin: 0 0 8px; }
   p { margin: 8px 0; color: var(--muted); }
   label { display: block; margin: 16px 0 6px; font-weight: 500; }
@@ -131,6 +133,16 @@ function ago(date: Date | null): string {
 
 const STATUS_LABEL: Record<string, string> = { running: "in progress", posted: "posted", no_new_findings: "nothing new", skipped: "skipped", failed: "failed" };
 
+function updateNotice(u: UpdateInfo) {
+  const commits = u.newCommits === 1 ? "1 new commit" : `${u.newCommits} new commits`;
+  return html`
+    <section class="card notice">
+      <b>Update available:</b> ${commits} since the version you run (<code>${u.runningSha.slice(0, 7)}</code>).
+      <a href="${u.compareUrl}">See what changed</a>. To update, open your Railway project and apply
+      the template update it shows, or redeploy the latest commit of each service.
+    </section>`;
+}
+
 export function dashboardPage(d: DashboardData, app: { slug: string; owner: string }) {
   const m = d.month;
   const totals = d.quality.reduce((t, q) => ({ findings: t.findings + q.findings, acted: t.acted + q.addressed + q.resolved }), { findings: 0, acted: 0 });
@@ -144,6 +156,8 @@ export function dashboardPage(d: DashboardData, app: { slug: string; owner: stri
         <a href="https://github.com/apps/${app.slug}/installations/new">install on more repos</a></div>
       <form method="post" action="/logout"><button type="submit">Log out</button></form>
     </section>
+
+    ${d.update ? updateNotice(d.update) : ""}
 
     <div class="cards">
       <div class="card"><div class="label">Spent this month</div><div class="stat">${usd(m.spentUsd)}</div>

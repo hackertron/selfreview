@@ -82,29 +82,55 @@ export function validateFindings(
   return result;
 }
 
+// A suggestion line this similar to an original line is an edit of it, not a different line.
+const EDITED_LINE_SIMILARITY = 0.6;
+
 /**
  * GitHub's "Commit suggestion" REPLACES lines line..end_line. Models often write "add this before
  * the line" instead, and accepting that would delete the original code (seen in M4: a suggested
  * guard replaced `this.links.set(...)`). Keep a suggestion only if it is short, its range is in
- * the diff, and it still contains every non-blank line it replaces.
+ * the diff, and every non-blank line it replaces is still there: kept as is, or edited.
  */
 export function safeSuggestion(f: Finding, diff: FileDiff): boolean {
   if (!f.suggestion) return false;
   if (f.suggestion.includes("```")) return false; // would close the suggestion block early
   const end = f.end_line ?? f.line;
   if (end < f.line || end - f.line >= 6) return false;
-  const kept = new Set(f.suggestion.split("\n").map((l) => l.trim()));
+  const proposed = f.suggestion.split("\n").map((l) => l.trim());
   const replaced: string[] = [];
   for (let n = f.line; n <= end; n++) {
     const original = diff.commentable.get(n);
     if (original === undefined) return false;
-    if (original.trim() && !kept.has(original.trim())) return false;
-    replaced.push(original.trim());
+    const line = original.trim();
+    const survives = proposed.some((p) => p === line || lineSimilarity(p, line) >= EDITED_LINE_SIMILARITY);
+    if (line && !survives) return false;
+    replaced.push(line);
   }
   // Accepting it would change nothing.
-  const proposed = f.suggestion.split("\n").map((l) => l.trim());
   if (proposed.join("\n") === replaced.join("\n")) return false;
   return true;
+}
+
+/** How alike two lines are, from 0 to 1: shared pairs of characters, ignoring spaces. */
+export function lineSimilarity(a: string, b: string): number {
+  const pa = characterPairs(a);
+  const pb = characterPairs(b);
+  let total = 0;
+  let shared = 0;
+  for (const count of pa.values()) total += count;
+  for (const count of pb.values()) total += count;
+  for (const [pair, count] of pa) shared += Math.min(count, pb.get(pair) ?? 0);
+  return total === 0 ? 1 : (2 * shared) / total;
+}
+
+function characterPairs(line: string): Map<string, number> {
+  const text = line.replace(/\s+/g, "");
+  const pairs = new Map<string, number>();
+  for (let i = 0; i < text.length - 1; i++) {
+    const pair = text.slice(i, i + 2);
+    pairs.set(pair, (pairs.get(pair) ?? 0) + 1);
+  }
+  return pairs;
 }
 
 /**

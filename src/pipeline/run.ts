@@ -9,9 +9,20 @@ import type { Logger } from "../log";
 import type { ReviewJob } from "../queue";
 import { parsePatch, type FileDiff } from "./diff";
 import { filterFiles, type ChangedFile } from "./filter";
+import { newChangesFrom } from "./incremental";
 import { EXPECTED_OUTPUT_TOKENS, chunkInputTokens, mapLimit, pickTier, planChunks, worstCaseCost } from "./plan";
 import { botComments, findExistingReview, postReview, upsertSummary, type PrRef } from "./publish";
-import { alreadyReviewed, failReservation, priorFindings, recordReview, reserveBudget, runningReservation, type ReviewRecord } from "./record";
+import { publishCheck, reviewConclusion, reviewTitle } from "./check";
+import {
+  alreadyReviewed,
+  failReservation,
+  lastReviewedSha,
+  priorFindings,
+  recordReview,
+  reserveBudget,
+  runningReservation,
+  type ReviewRecord,
+} from "./record";
 import { renderSummary } from "./render";
 import { CONFIG_PATH, parseRepoConfig, skipReason } from "./repo-config";
 import { validateFindings } from "./validate";
@@ -49,7 +60,13 @@ export async function runReview(
   const base = { installationId: job.installationId, repo: job.repo, pr: job.pr, headSha, baseSha: pr.base.sha, trigger: job.trigger };
   const skipped = async (reason: string, summary?: Parameters<typeof renderSummary>[0]): Promise<PipelineOutcome> => {
     await recordReview(deps.pool, { ...base, status: "skipped", skipReason: reason, durationMs: Date.now() - started });
-    if (summary) await upsertSummary(gh, prRef, botLogin, renderSummary(summary));
+    if (summary) {
+      const text = renderSummary(summary);
+      await upsertSummary(gh, prRef, botLogin, text);
+      const report = { conclusion: "neutral" as const, title: `Skipped: ${reason}`, summary: text };
+      const notPosted = await publishCheck(gh, { owner, repo, headSha }, report);
+      if (notPosted) log.info("check not posted", { reason: notPosted });
+    }
     log.info("review skipped", { sha: headSha.slice(0, 7), reason });
     return { status: "skipped", reason };
   };
@@ -81,9 +98,19 @@ export async function runReview(
   if (skip) return skipped(skip);
   const changed: ChangedFile[] = await gh.paginate(gh.pulls.listFiles, { ...prRef, per_page: 100 });
 
-  // 4. Filter out noise
-  const { review: files, skipped: skippedFiles } = filterFiles(changed, config.ignore);
-  const diffs = new Map<string, FileDiff>(files.map((f) => [f.filename, parsePatch(f.patch!)]));
+  // Incremental: after a successful review, only the commits since then are reviewed. Not after
+  // a /selfreview command (a full re-run was asked for), or when the history was rewritten.
+  const since = job.force ? null : await lastReviewedSha(deps.pool, job.repo, job.pr);
+  const newChanges = since ? await changesSince(gh, owner, repo, since, headSha) : null;
+
+  // 4. Filter out noise. Comments must land on lines of the whole PR's diff, so that's what
+  // they're checked against, even when only the newest changes are reviewed.
+  const prFiles = filterFiles(changed, config.ignore);
+  const diffs = new Map<string, FileDiff>(prFiles.review.map((f) => [f.filename, parsePatch(f.patch!)]));
+  const { review: files, skipped: skippedFiles } = newChanges
+    ? filterFiles(newChanges.filter((f) => diffs.has(f.filename)), config.ignore)
+    : prFiles;
+  if (newChanges && files.length === 0) return skipped(`no reviewable changes since ${since!.slice(0, 7)}`);
 
   // 5. Plan: model tier, context, chunks, cost estimate
   const tier = pickTier(
@@ -105,7 +132,8 @@ export async function runReview(
   for (const path of tooLarge) skippedFiles.push({ path, reason: "too large for one model request" });
 
   const summaryBase = {
-    sha: headSha, posted: [], outsideDiff: [], skippedFiles, filesReviewed: 0, model: spec.id, costUsd: 0,
+    sha: headSha, since: newChanges ? since! : undefined,
+    posted: [], outsideDiff: [], skippedFiles, filesReviewed: 0, model: spec.id, costUsd: 0,
     warning: [configWarning, modelNote].filter(Boolean).join(" · ") || undefined,
   };
   // Cost limits are only enforceable with a price, so an unpriced model is never run (it would be
@@ -169,9 +197,17 @@ export async function runReview(
     signal?.throwIfAborted();
     const posted = result.post.length ? await postReview(gh, prRef, headSha, botLogin, result.post) : null;
     const reviewedCount = chunks.reduce((n, c) => n + c.length, 0);
-    await upsertSummary(gh, prRef, botLogin, renderSummary({
+    const summary = renderSummary({
       ...summaryBase, posted: result.post, outsideDiff: result.outsideDiff, filesReviewed: reviewedCount, costUsd,
-    }));
+    });
+    await upsertSummary(gh, prRef, botLogin, summary);
+    const severities = result.post.map((f) => f.severity);
+    const report = {
+      conclusion: reviewConclusion(severities, config.fail_on),
+      title: reviewTitle(severities),
+      summary,
+    };
+    const checkNotPosted = await publishCheck(gh, { owner, repo, headSha }, report);
 
     // 9. Record (settles the reservation with the actual cost, if there was one)
     const status = posted ? "posted" : "no_new_findings";
@@ -182,7 +218,8 @@ export async function runReview(
     });
     log.info("review done", {
       sha: headSha.slice(0, 7), status, model: spec.id, tier, chunks: chunks.length, found: findings.length, invalid,
-      posted: result.post.length, outsideDiff: result.outsideDiff.length,
+      posted: result.post.length, outsideDiff: result.outsideDiff.length, since: since?.slice(0, 7),
+      check: checkNotPosted ? `not posted: ${checkNotPosted}` : report.conclusion,
       dropped: Object.fromEntries([...new Set(result.dropped.map((d) => d.reason))].map((r) => [r, result.dropped.filter((d) => d.reason === r).length])),
       tokensIn: usage.inputTokens, tokensOut: usage.outputTokens, costUsd: Number(costUsd.toFixed(6)), durationMs: Date.now() - started,
     });
@@ -190,6 +227,17 @@ export async function runReview(
   } catch (err) {
     if (reservation) await failReservation(deps.pool, reservation, spentUsd, String((err as Error).message ?? err));
     throw err; // pg-boss retries the job
+  }
+}
+
+/** Files changed since the last reviewed commit, or null for a full review (incremental.ts). */
+async function changesSince(gh: Octokit, owner: string, repo: string, since: string, head: string) {
+  try {
+    const { data } = await gh.repos.compareCommitsWithBasehead({ owner, repo, basehead: `${since}...${head}` });
+    return newChangesFrom({ status: data.status, files: data.files as ChangedFile[] | undefined });
+  } catch (err: any) {
+    if (err?.status === 404) return null; // the old commit is gone (force-pushed away)
+    throw err;
   }
 }
 

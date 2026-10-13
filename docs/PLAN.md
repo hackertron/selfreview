@@ -206,6 +206,19 @@ Docs: 24 places in ARCHITECTURE.md described a planned detail as built or gave a
 
 Also added CI (`.github/workflows/test.yml`): typecheck plus all unit and integration tests against Postgres 17 on every push to main and every PR.
 
+### v1.1: everyday use ✅ (2026-10-13)
+
+What came up in the first days of using it on real repos:
+
+- **One-click fixes rarely appeared.** A fix that edits a line was always dropped, so only about 1 review in 6 had one. Edited lines are now allowed when each replaced line is still recognisable (similarity ≥ 0.6). A guard that replaces the line it guards (0.42 in the M4 case) is still dropped.
+- **Every push re-reviewed the whole PR.** Now only the commits since the last successful review are sent to the model. A rebase or force-push, a cut-off file list, or `/selfreview` falls back to a full review.
+- **No status next to CI.** Each review posts a Selfreview check; `fail_on` in `.selfreview.yml` can make it fail.
+- **One deployment couldn't cover a personal account and an org.** `ALLOWED_ACCOUNTS` plus a public app does, and PRs from anyone else are refused at the webhook.
+- **No budget by default.** Now $10 a month unless set.
+- **Deployed copies fell behind.** Railway already shows template updates in the project; the dashboard now says it too.
+
+Tests: 17 new unit tests (tests/v1_1.test.ts) and one integration test (a PR from an account that isn't allowed is never queued). 122 pass.
+
 ## Testing approach
 
 - **Unit tests** for the pure steps (filter, chunking, diff-line mapping, validation, dedupe, fingerprint, cost math). These hold most of the logic.
