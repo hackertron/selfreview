@@ -4,7 +4,7 @@ import { describe, expect, test } from "bun:test";
 import { loadConfig } from "../src/config";
 import { isAllowedAccount } from "../src/github/accounts";
 import type { Finding } from "../src/llm/types";
-import { newFindingSeverities, reviewConclusion, reviewTitle } from "../src/pipeline/check";
+import { newFindingSeverities, reviewConclusion, reviewTitle, stillFailing } from "../src/pipeline/check";
 import { parsePatch } from "../src/pipeline/diff";
 import type { ChangedFile } from "../src/pipeline/filter";
 import { newChangesFrom } from "../src/pipeline/incremental";
@@ -96,6 +96,14 @@ describe("the Selfreview check", () => {
     });
     expect(severities).toEqual(["low", "high", "medium"]);
     expect(reviewConclusion(severities, "high")).toBe("failure");
+  });
+
+  test("a failed check stays failed on later pushes until a full review passes", () => {
+    expect(stillFailing("success", "failure")).toBe(true);
+    expect(stillFailing("neutral", "failure")).toBe(true);
+    expect(stillFailing("failure", "failure")).toBe(false); // already failing
+    expect(stillFailing("success", "success")).toBe(false);
+    expect(stillFailing("success", null)).toBe(false); // no earlier check
   });
 
   test("the title counts findings by severity", () => {

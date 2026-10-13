@@ -90,7 +90,7 @@ Comment **`/selfreview`** on a PR to re-run a full review. Maintainers can use i
 
 ### The Selfreview check
 
-Each review also posts a **Selfreview** check on the commit: green with no new findings, grey (neutral) with findings, and red only when a finding reaches `fail_on`. With `fail_on` set, branch protection can block the merge. Apps created before v1.1 need one change first: in the GitHub App's settings, under *Permissions*, set **Checks** to *Read and write*, then accept the new permission on each installation. Until then, reviews work as before without the check.
+Each review also posts a **Selfreview** check on the commit: green with no new findings, grey (neutral) with findings, and red only when a finding reaches `fail_on`. With `fail_on` set, branch protection can block the merge. Because later pushes are reviewed incrementally, a red check stays red on later pushes until a full review passes: comment `/selfreview` once it's fixed. Skipped commits (drafts, `skip_labels`) get a skipped check, which GitHub counts as passing. Apps created before v1.1 need one change first: in the GitHub App's settings, under *Permissions*, set **Checks** to *Read and write*, then accept the new permission on each installation. Until then, reviews work as before without the check.
 
 ### More than one account
 

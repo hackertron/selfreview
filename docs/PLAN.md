@@ -217,9 +217,9 @@ What came up in the first days of using it on real repos:
 - **No budget by default.** Now $10 a month unless set.
 - **Deployed copies fell behind.** Railway already shows template updates in the project; the dashboard now says it too.
 
-Selfreview reviewed this release's own PR (#1: 20 files, $0.06) and found a real bug in it: the check only counted findings posted inline, so a high-severity finding on an unchanged line left it green even with `fail_on: high`. It now counts every new finding (inline, outside the changed lines, or cut by `max_comments`), not repeats.
+Selfreview reviewed this release's own PR (#1: 20 files, $0.06) and found a real bug in it: the check only counted findings posted inline, so a high-severity finding on an unchanged line left it green even with `fail_on: high`. It now counts every new finding (inline, outside the changed lines, or cut by `max_comments`), not repeats. Its second pass ($0.04) found one more: a push that only touched ignored files got no check at all, which blocks a required check forever. Every skip now posts a check, and a failed check stays failed on incremental pushes until a full review passes (otherwise unrelated pushes would turn it green).
 
-Tests: 18 new unit tests (tests/v1_1.test.ts) and one integration test (a PR from an account that isn't allowed is never queued). 123 pass.
+Tests: 19 new unit tests (tests/v1_1.test.ts) and one integration test (a PR from an account that isn't allowed is never queued). 124 pass.
 
 ## Testing approach
 

@@ -488,7 +488,7 @@ Bigger PRs cost more (they're chunked); `MAX_REVIEW_COST_USD` and `MONTHLY_BUDGE
 
 **v1.1 (2026-10-13): better for everyday use**
 - Incremental reviews: after a successful review, the next one only covers the commits since then (GitHub's compare API). Comments are still checked against the whole PR's diff. A rewritten history, a cut-off file list or a `/selfreview` comment gets a full review.
-- The Selfreview check on each reviewed commit: success with no new findings, neutral with findings, failure when a finding reaches `fail_on` in `.selfreview.yml`. New apps ask for the Checks permission; older ones skip the check until it's added.
+- The Selfreview check on each reviewed commit: success with no new findings, neutral with findings, failure when a finding reaches `fail_on` in `.selfreview.yml`. Findings outside the changed lines count too. A failure stays on later (incremental) pushes until a full review passes, and every skipped commit still gets a check, so a required check never blocks forever. New apps ask for the Checks permission; older ones skip the check until it's added.
 - `ALLOWED_ACCOUNTS`: one deployment can serve more accounts than the app's owner. The app has to be public for that, so PRs from accounts not on the list are ignored at the webhook.
 - `MONTHLY_BUDGET_USD` defaults to $10, so a fresh deploy can't run up a bill.
 - One-click fixes may now edit a line, not only add around it. Each replaced line must still be there, unchanged or edited (similarity ≥ 0.6), so a fix that would delete the code it replaces is still dropped.

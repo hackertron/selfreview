@@ -6,7 +6,8 @@ import type { Octokit } from "@octokit/rest";
 import type { Severity, ValidationResult } from "./validate";
 import type { RepoConfig } from "./repo-config";
 
-export type CheckConclusion = "success" | "neutral" | "failure";
+// GitHub counts success, neutral and skipped as passing for a required check.
+export type CheckConclusion = "success" | "neutral" | "failure" | "skipped";
 export type CheckReport = { conclusion: CheckConclusion; title: string; summary: string };
 
 const RANK: Record<Severity, number> = { low: 1, medium: 2, high: 3 };
@@ -19,6 +20,35 @@ const RANK: Record<Severity, number> = { low: 1, medium: 2, high: 3 };
 export function newFindingSeverities(result: ValidationResult): Severity[] {
   const cut = result.dropped.filter((d) => d.reason === "max_comments reached").map((d) => d.finding);
   return [...result.post, ...result.outsideDiff, ...cut].map((f) => f.severity);
+}
+
+/**
+ * With incremental reviews, a later push only shows the findings it introduced. So a failed check
+ * stays failed until a full review (/selfreview) passes; otherwise pushing unrelated commits would
+ * turn it green while the finding is still there.
+ */
+export function stillFailing(current: CheckConclusion, previous: string | null): boolean {
+  return previous === "failure" && current !== "failure";
+}
+
+/** The Selfreview check's conclusion on an earlier commit, or null if there's none (or no access). */
+export async function previousConclusion(
+  gh: Octokit,
+  where: { owner: string; repo: string },
+  sha: string,
+): Promise<string | null> {
+  try {
+    const { data } = await gh.checks.listForRef({
+      owner: where.owner,
+      repo: where.repo,
+      ref: sha,
+      check_name: "Selfreview",
+      per_page: 1,
+    });
+    return data.check_runs[0]?.conclusion ?? null;
+  } catch {
+    return null;
+  }
 }
 
 /** Nothing new: success. A finding at or above `fail_on`: failure. Anything else: neutral. */
