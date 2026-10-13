@@ -4,7 +4,7 @@ import { describe, expect, test } from "bun:test";
 import { loadConfig } from "../src/config";
 import { isAllowedAccount } from "../src/github/accounts";
 import type { Finding } from "../src/llm/types";
-import { reviewConclusion, reviewTitle } from "../src/pipeline/check";
+import { newFindingSeverities, reviewConclusion, reviewTitle } from "../src/pipeline/check";
 import { parsePatch } from "../src/pipeline/diff";
 import type { ChangedFile } from "../src/pipeline/filter";
 import { newChangesFrom } from "../src/pipeline/incremental";
@@ -82,6 +82,20 @@ describe("the Selfreview check", () => {
     expect(reviewConclusion(["medium"], "high")).toBe("neutral");
     expect(reviewConclusion(["medium", "low"], "medium")).toBe("failure");
     expect(reviewConclusion(["high"], "medium")).toBe("failure");
+  });
+
+  test("counts findings outside the changed lines and ones cut by max_comments, not repeats", () => {
+    const high = finding({ severity: "high" });
+    const severities = newFindingSeverities({
+      post: [{ ...finding({ severity: "low" }), fingerprint: "0123456789ab" }],
+      outsideDiff: [high],
+      dropped: [
+        { finding: finding({ severity: "medium" }), reason: "max_comments reached" },
+        { finding: high, reason: "already raised" },
+      ],
+    });
+    expect(severities).toEqual(["low", "high", "medium"]);
+    expect(reviewConclusion(severities, "high")).toBe("failure");
   });
 
   test("the title counts findings by severity", () => {

@@ -12,7 +12,7 @@ import { filterFiles, type ChangedFile } from "./filter";
 import { newChangesFrom } from "./incremental";
 import { EXPECTED_OUTPUT_TOKENS, chunkInputTokens, mapLimit, pickTier, planChunks, worstCaseCost } from "./plan";
 import { botComments, findExistingReview, postReview, upsertSummary, type PrRef } from "./publish";
-import { publishCheck, reviewConclusion, reviewTitle } from "./check";
+import { newFindingSeverities, publishCheck, reviewConclusion, reviewTitle } from "./check";
 import {
   alreadyReviewed,
   failReservation,
@@ -201,7 +201,7 @@ export async function runReview(
       ...summaryBase, posted: result.post, outsideDiff: result.outsideDiff, filesReviewed: reviewedCount, costUsd,
     });
     await upsertSummary(gh, prRef, botLogin, summary);
-    const severities = result.post.map((f) => f.severity);
+    const severities = newFindingSeverities(result);
     const report = {
       conclusion: reviewConclusion(severities, config.fail_on),
       title: reviewTitle(severities),

@@ -3,13 +3,23 @@
 // permission (read & write). Apps created before v1.1 don't have it; until it's added, the check
 // is skipped and the review works as before.
 import type { Octokit } from "@octokit/rest";
-import type { Severity } from "./validate";
+import type { Severity, ValidationResult } from "./validate";
 import type { RepoConfig } from "./repo-config";
 
 export type CheckConclusion = "success" | "neutral" | "failure";
 export type CheckReport = { conclusion: CheckConclusion; title: string; summary: string };
 
 const RANK: Record<Severity, number> = { low: 1, medium: 2, high: 3 };
+
+/**
+ * Every real new finding counts toward the check, not only those posted inline: one on an
+ * unchanged line (listed in the summary) or cut by max_comments would otherwise leave the check
+ * green with fail_on set. Repeats of earlier findings and those below min_severity don't count.
+ */
+export function newFindingSeverities(result: ValidationResult): Severity[] {
+  const cut = result.dropped.filter((d) => d.reason === "max_comments reached").map((d) => d.finding);
+  return [...result.post, ...result.outsideDiff, ...cut].map((f) => f.severity);
+}
 
 /** Nothing new: success. A finding at or above `fail_on`: failure. Anything else: neutral. */
 export function reviewConclusion(severities: Severity[], failOn: RepoConfig["fail_on"]): CheckConclusion {
