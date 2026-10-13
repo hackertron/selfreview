@@ -13,7 +13,7 @@ import { newChangesFrom } from "./incremental";
 import { EXPECTED_OUTPUT_TOKENS, chunkInputTokens, mapLimit, pickTier, planChunks, worstCaseCost } from "./plan";
 import { botComments, findExistingReview, postReview, upsertSummary, type PrRef } from "./publish";
 import {
-  newFindingSeverities,
+  checkSeverities,
   previousConclusion,
   publishCheck,
   reviewConclusion,
@@ -99,6 +99,14 @@ export async function runReview(
       await recordReview(deps.pool, {
         ...base, reviewId: reservation?.id, status: "posted", githubReviewId: existing.reviewId, findings: existing.comments,
         costUsd: reservation?.costUsd ?? 0, durationMs: Date.now() - started,
+      });
+      // The crashed attempt may not have posted the check: post it from the adopted comments.
+      const { config: adoptedConfig } = parseRepoConfig(await readFile(gh, owner, repo, CONFIG_PATH, pr.base.ref));
+      const severities = existing.comments.map((c) => c.severity);
+      await publishCheck(gh, { owner, repo, headSha }, {
+        conclusion: reviewConclusion(severities, adoptedConfig.fail_on),
+        title: reviewTitle(severities),
+        summary: "Review posted by an earlier attempt of this job.",
       });
       log.info("adopted review posted by an earlier attempt", { sha: headSha.slice(0, 7), reviewId: existing.reviewId });
       return { status: "posted", reason: "adopted", findings: existing.comments.length };
@@ -222,15 +230,15 @@ export async function runReview(
       ...summaryBase, posted: result.post, outsideDiff: result.outsideDiff, filesReviewed: reviewedCount, costUsd,
     });
     await upsertSummary(gh, prRef, botLogin, summary);
-    const severities = newFindingSeverities(result);
-    const conclusion = reviewConclusion(severities, config.fail_on);
+    const { fresh, repeated } = checkSeverities(result);
+    const conclusion = reviewConclusion([...fresh, ...repeated], config.fail_on);
     const report = stillFailing(conclusion, previous)
       ? {
           conclusion: "failure" as const,
           title: `Still failing since ${since!.slice(0, 7)}: comment /selfreview for a full review once fixed`,
           summary,
         }
-      : { conclusion, title: reviewTitle(severities), summary };
+      : { conclusion, title: reviewTitle(fresh, repeated.length), summary };
     const checkNotPosted = await publishCheck(gh, { owner, repo, headSha }, report);
 
     // 9. Record (settles the reservation with the actual cost, if there was one)

@@ -4,7 +4,7 @@ import { describe, expect, test } from "bun:test";
 import { loadConfig } from "../src/config";
 import { isAllowedAccount } from "../src/github/accounts";
 import type { Finding } from "../src/llm/types";
-import { newFindingSeverities, reviewConclusion, reviewTitle, stillFailing } from "../src/pipeline/check";
+import { checkSeverities, publishCheck, reviewConclusion, reviewTitle, stillFailing } from "../src/pipeline/check";
 import { parsePatch } from "../src/pipeline/diff";
 import type { ChangedFile } from "../src/pipeline/filter";
 import { newChangesFrom } from "../src/pipeline/incremental";
@@ -84,18 +84,29 @@ describe("the Selfreview check", () => {
     expect(reviewConclusion(["high"], "medium")).toBe("failure");
   });
 
-  test("counts findings outside the changed lines and ones cut by max_comments, not repeats", () => {
-    const high = finding({ severity: "high" });
-    const severities = newFindingSeverities({
+  test("counts findings outside the changed lines and ones cut by max_comments", () => {
+    const { fresh } = checkSeverities({
       post: [{ ...finding({ severity: "low" }), fingerprint: "0123456789ab" }],
-      outsideDiff: [high],
+      outsideDiff: [finding({ severity: "high" })],
+      dropped: [{ finding: finding({ severity: "medium" }), reason: "max_comments reached" }],
+    });
+    expect(fresh).toEqual(["low", "high", "medium"]);
+    expect(reviewConclusion(fresh, "high")).toBe("failure");
+  });
+
+  test("an unfixed earlier finding found again keeps a full re-review failing", () => {
+    const { fresh, repeated } = checkSeverities({
+      post: [],
+      outsideDiff: [],
       dropped: [
-        { finding: finding({ severity: "medium" }), reason: "max_comments reached" },
-        { finding: high, reason: "already raised" },
+        { finding: finding({ severity: "high" }), reason: "already raised" },
+        { finding: finding({ severity: "low" }), reason: "below min_severity" },
       ],
     });
-    expect(severities).toEqual(["low", "high", "medium"]);
-    expect(reviewConclusion(severities, "high")).toBe("failure");
+    expect(fresh).toEqual([]);
+    expect(repeated).toEqual(["high"]);
+    expect(reviewConclusion([...fresh, ...repeated], "high")).toBe("failure");
+    expect(reviewTitle(fresh, repeated.length)).toBe("No new findings, 1 earlier one still there");
   });
 
   test("a failed check stays failed on later pushes until a full review passes", () => {
@@ -104,6 +115,26 @@ describe("the Selfreview check", () => {
     expect(stillFailing("failure", "failure")).toBe(false); // already failing
     expect(stillFailing("success", "success")).toBe(false);
     expect(stillFailing("success", null)).toBe(false); // no earlier check
+  });
+
+  test("posting the check is retried on a GitHub error, but not on a missing permission", async () => {
+    const httpError = (status: number) => Object.assign(new Error(`HTTP ${status}`), { status });
+    const github = (create: () => Promise<void>) => ({ checks: { create } }) as any;
+    const where = { owner: "o", repo: "r", headSha: "abc" };
+    const report = { conclusion: "success" as const, title: "t", summary: "s" };
+
+    let calls = 0;
+    const flaky = github(async () => {
+      calls += 1;
+      if (calls < 3) throw httpError(502);
+    });
+    expect(await publishCheck(flaky, where, report, 1)).toBeNull();
+    expect(calls).toBe(3);
+
+    const noPermission = github(async () => {
+      throw httpError(403);
+    });
+    expect(await publishCheck(noPermission, where, report, 1)).toBe("the GitHub App has no Checks permission");
   });
 
   test("the title counts findings by severity", () => {
