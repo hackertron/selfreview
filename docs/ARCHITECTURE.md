@@ -27,7 +27,7 @@ When a pull request is opened or updated, GitHub sends a webhook to the **api** 
 **Non-goals (v1)**: deliberately deferred, see [Roadmap](#11-roadmap)
 - Running the PR's code or tests (v2, via Railway Sandboxes).
 - Whole-repo semantic search / embeddings index (v3).
-- Multi-tenant hosting. **One deployment serves one owner** (a person or an org), which is what keeps it simple.
+- Multi-tenant hosting. **One deployment serves one owner** (a person or an org), plus any accounts the owner lists in `ALLOWED_ACCOUNTS` (v1.1). That's what keeps it simple.
 - GitLab / Bitbucket.
 - Auto-committing fixes.
 
@@ -216,7 +216,7 @@ A price per model (`$/M input`, `$/M output`, `$/M cached input`) turns the prov
 **Caps are enforced for every model:**
 - **Unpriced models are never run.** A model with no known price (e.g. an `openai:` model missing from `MODEL_PRICES`) is skipped with an explanation in the summary, never run uncapped. If OpenRouter's price list can't be fetched, the job is retried later.
 - `MAX_REVIEW_COST_USD` (default $1) is checked *before* calling the model, from estimated tokens.
-- `MONTHLY_BUDGET_USD` (default unset) is a hard cap even with many workers. Before calling the model, a review **reserves its worst-case cost** under a Postgres advisory lock: every call using all its output tokens, a retry resending the conversation, and a 2× margin on input. The reservation is a `running` row counted in this month's spend.
+- `MONTHLY_BUDGET_USD` (default $10 since v1.1) is a hard cap even with many workers. Before calling the model, a review **reserves its worst-case cost** under a Postgres advisory lock: every call using all its output tokens, a retry resending the conversation, and a 2× margin on input. The reservation is a `running` row counted in this month's spend.
   - Finishing settles it to the actual cost.
   - A failure releases it down to what was spent.
   - A retry that adopts an already-posted review settles the crashed attempt's reservation.
@@ -295,7 +295,8 @@ flowchart LR
 | `ALLOWED_MODELS` | the two above, plus a few cheap OpenRouter models (GLM 5.3 Flash, DeepSeek V4 Flash/Pro, gpt-oss-120b) | What repos may choose |
 | `MODEL_PRICES` | — | JSON prices for models without a built-in or OpenRouter price (§5.3) |
 | `MAX_REVIEW_COST_USD` | `1.00` | Per-review cap |
-| `MONTHLY_BUDGET_USD` | unset | Hard monthly cap (§5.3) |
+| `MONTHLY_BUDGET_USD` | `10` | Hard monthly cap (§5.3) |
+| `ALLOWED_ACCOUNTS` | — | api: other GitHub accounts whose PRs may be reviewed; makes new apps public |
 | `WORKER_CONCURRENCY` | `3` | Reviews in parallel per worker replica |
 | `MAX_REVIEWS_PER_ORG` | `2` | Reviews in parallel per installation, across all workers (§8.1) |
 | `ADMIN_PASSWORD`, `ENCRYPTION_KEY` | generated | Setup/dashboard login, credential encryption |
@@ -383,7 +384,7 @@ This is also the most credible content: "here's how often it's right, and what e
 | Code exposure | Code is processed in memory only, never written to the DB or logs (§6 has the full list of what *is* stored). The only third party that sees code is the LLM provider *you* chose, or none with a self-hosted model. |
 | **Prompt injection** (a PR that says "ignore your instructions…") | PR content is treated as untrusted data. In v1 the model has **no tools**: it can only return JSON findings, which are schema-checked and line-checked. Output is sanitised (no @mentions, images or HTML). The bot only ever *comments*: it never approves or requests changes. The worst case is a bad comment, never an action. |
 | Over-broad access | Least-privilege GitHub App permissions, per-installation short-lived tokens. |
-| Dashboard access | `ADMIN_PASSWORD` in v1. After 10 wrong passwords, logins are refused for 15 minutes (counted for everyone together, since the visitor IP behind Railway's proxy can be faked). GitHub login restricted to org members in v1.1. |
+| Dashboard access | `ADMIN_PASSWORD` in v1. After 10 wrong passwords, logins are refused for 15 minutes (counted for everyone together, since the visitor IP behind Railway's proxy can be faked). GitHub login restricted to org members in v1.2. |
 
 ---
 
@@ -392,7 +393,8 @@ This is also the most credible content: "here's how often it's right, and what e
 | Version | Adds | Railway feature showcased |
 |---|---|---|
 | **v1** | Everything above | Infrastructure as code (`.railway/railway.ts`), templates, reference variables + generated secrets, private networking, replicas, Cron, pre-deploy command, healthchecks + draining |
-| v1.1 | Incremental reviews (only the commits since the last review), Check Run status, GitHub login for the dashboard, optional anonymous usage telemetry (opt-out) | — |
+| v1.1 ✅ | Incremental reviews (only the commits since the last review), the Selfreview check (with `fail_on`), `ALLOWED_ACCOUNTS` for more than one account, a $10 default monthly budget, one-click fixes that edit a line, an update notice on the dashboard | — |
+| v1.2 | GitHub login for the dashboard, optional anonymous usage telemetry (opt-out) | — |
 | **v2** | **Run it, don't just read it:** spin up a Railway **Sandbox** per PR, run the tests, include failures in the review. Optionally drive the PR's preview environment with a headless browser and attach screenshots. | Sandboxes, PR environments |
 | v3 | Repo-wide context via a pgvector index ("this function is also called from 4 other places"). **Opt-in**, because embeddings are derived from code: the first feature that would store anything code-related. | Postgres extensions |
 | later | GitLab support, multiple OpenAI-compatible endpoints, auto-fix suggestions as commits | — |
@@ -462,7 +464,7 @@ Bigger PRs cost more (they're chunked); `MAX_REVIEW_COST_USD` and `MONTHLY_BUDGE
 - Output is sanitised (@mentions, images, HTML), and suggestion blocks are limited to short validated ranges.
 - New quality signal: **addressed rate** (thread outdated or resolved). `findings` gains `outcome`, and `reviews` gains `status`, `skip_reason` and `github_review_id`.
 - Reliability table, worker draining time, migrations via pre-deploy command, structured logs.
-- Dashboard login is `ADMIN_PASSWORD` in v1, GitHub login in v1.1. Per-org fairness moved to the roadmap.
+- Dashboard login is `ADMIN_PASSWORD` in v1, GitHub login in v1.2. Per-org fairness moved to the roadmap.
 - Added the operator settings table, main libraries, and an eval set with cost per bug found.
 
 **v0.3 (2026-10-09): M0 results**
@@ -483,5 +485,13 @@ Bigger PRs cost more (they're chunked); `MAX_REVIEW_COST_USD` and `MONTHLY_BUDGE
 
 **v1.0.2 (2026-10-12): one-click suggestions**
 - Models often copied the line after the flagged one into a suggestion, so accepting it added that line twice. Lines copied from just before or after the range are now removed, and a suggestion that would change nothing is dropped.
+
+**v1.1 (2026-10-13): better for everyday use**
+- Incremental reviews: after a successful review, the next one only covers the commits since then (GitHub's compare API). Comments are still checked against the whole PR's diff. A rewritten history, a cut-off file list or a `/selfreview` comment gets a full review.
+- The Selfreview check on each reviewed commit: success with no new findings, neutral with findings, failure when a finding reaches `fail_on` in `.selfreview.yml`. Findings outside the changed lines count too. A failure stays on later (incremental) pushes until a full review passes, and every skipped commit still gets a check, so a required check never blocks forever. New apps ask for the Checks permission; older ones skip the check until it's added.
+- `ALLOWED_ACCOUNTS`: one deployment can serve more accounts than the app's owner. The app has to be public for that, so PRs from accounts not on the list are ignored at the webhook.
+- `MONTHLY_BUDGET_USD` defaults to $10, so a fresh deploy can't run up a bill.
+- One-click fixes may now edit a line, not only add around it. Each replaced line must still be there, unchanged or edited (similarity ≥ 0.6), so a fix that would delete the code it replaces is still dropped.
+- The dashboard notes when the main branch has commits the deployment doesn't (cached GitHub compare, `UPDATE_REPO`).
 
 **v0.1 (2026-10-08)**: first draft.

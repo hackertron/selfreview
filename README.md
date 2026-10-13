@@ -46,6 +46,7 @@ One Docker image runs as three Railway services (api, worker, cron; each takes i
 Highlights from building it:
 
 - **A job is a PR, not a commit.** Rapid pushes collapse into at most one running and one waiting review, and the last review always covers the newest commit.
+- **Incremental reviews.** After the first review, each push only gets the commits since the last review, which costs less on long-running PRs. A rebase or force-push, or a `/selfreview` comment, gets a full review.
 - **Webhooks are never lost.** GitHub doesn't retry failed deliveries, so cron resends them (tested with a simulated outage).
 - **Idempotent posting.** A crash after posting can't double-post; the retry adopts the existing review.
 - **Safe by default.** Strangers' PRs aren't reviewed automatically (no running up your bill), a PR can't change its own review rules, and one-click suggestions that would delete code are dropped.
@@ -62,9 +63,15 @@ Railway variables on the **worker** service:
 | `MODEL_SMALL`, `MODEL_LARGE` | `openrouter:z-ai/glm-5.3` | `provider:model`. PRs under 400 changed lines get `MODEL_SMALL` |
 | `ALLOWED_MODELS` | the two above + a few cheap OpenRouter models | Extra models a repo may choose |
 | `MAX_REVIEW_COST_USD` | `1` | Skip PRs estimated to cost more |
-| `MONTHLY_BUDGET_USD` | unset | Hard monthly cap: each review reserves its worst-case cost first, then settles to the actual cost, so neither parallel workers nor long answers can overshoot |
+| `MONTHLY_BUDGET_USD` | `10` | Hard monthly cap: each review reserves its worst-case cost first, then settles to the actual cost, so neither parallel workers nor long answers can overshoot. Set it on the api too, so the dashboard shows the same number |
 | `MODEL_PRICES` | — | JSON prices ($/1M tokens) for models without a built-in (Anthropic) or OpenRouter price, e.g. `{"openai:gpt-5-mini": {"input": 0.25, "output": 2}}`. Self-hosted models need `{"input": 0, "output": 0}`. A model with no price is skipped, never run uncapped. |
 | `ANTHROPIC_API_KEY`, `OPENAI_API_KEY`, `OPENAI_COMPATIBLE_API_KEY` + `OPENAI_COMPATIBLE_BASE_URL` | — | Other providers |
+
+Railway variables on the **api** service:
+
+| Variable | Default | |
+|---|---|---|
+| `ALLOWED_ACCOUNTS` | — | Other GitHub users or orgs whose repos you want reviewed, comma-separated, e.g. `acme,my-side-project-org`. The app's owner is always allowed; PRs from any other account are ignored. See [More than one account](#more-than-one-account) |
 
 Per repository, an optional **`.selfreview.yml`**. It's read from the base branch, so a PR can't loosen its own review:
 
@@ -76,9 +83,28 @@ risky_paths: ["src/auth/**"]   # always use MODEL_LARGE
 min_severity: medium           # low | medium | high
 max_comments: 15
 skip_labels: ["no-review"]
+fail_on: never                 # the Selfreview check fails at this severity: never | medium | high
 ```
 
-Comment **`/selfreview`** on a PR to re-run a review. Maintainers can use it to review PRs from outside contributors.
+Comment **`/selfreview`** on a PR to re-run a full review. Maintainers can use it to review PRs from outside contributors.
+
+### The Selfreview check
+
+Each review also posts a **Selfreview** check on the commit: green with no new findings, grey (neutral) with findings, and red only when a finding reaches `fail_on`. With `fail_on` set, branch protection can block the merge. Because later pushes are reviewed incrementally, a red check stays red on later pushes until a full review passes: comment `/selfreview` once it's fixed. Skipped commits (drafts, `skip_labels`) get a skipped check, which GitHub counts as passing. Apps created before v1.1 need one change first: in the GitHub App's settings, under *Permissions*, set **Checks** to *Read and write*, then accept the new permission on each installation. Until then, reviews work as before without the check.
+
+### More than one account
+
+A GitHub App can only be installed by the account that owns it unless it's public. To review your personal repos and an org's with one deployment:
+
+1. Set `ALLOWED_ACCOUNTS` on the api to the other accounts, e.g. `acme`.
+2. Make the app public: GitHub App settings → *Advanced* → **Make public**. Apps created after `ALLOWED_ACCOUNTS` is set are public from the start.
+3. Install it on each account's repos.
+
+Anyone can install a public app, but Selfreview only reviews PRs in the owner's and the listed accounts' repos, so nobody else can spend your budget.
+
+### Updating
+
+When a new version is out, Railway shows an update notice in your project, and the dashboard says how many commits you're behind. Apply the update from the Railway notice, or redeploy the latest commit of each service (api, worker, cron).
 
 ## Development
 

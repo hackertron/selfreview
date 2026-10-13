@@ -13,7 +13,10 @@ export type WebhookResult = { status: number; outcome: string };
 
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
-export function createWebhookHandler(pool: Pool, boss: PgBoss) {
+/** Whether a repo owner's PRs may be reviewed (see src/github/accounts.ts). */
+export type AccountCheck = (login: string) => Promise<boolean>;
+
+export function createWebhookHandler(pool: Pool, boss: PgBoss, accountAllowed: AccountCheck = async () => true) {
   return async function acceptWebhook(hook: IncomingWebhook): Promise<WebhookResult> {
     if (!UUID.test(hook.deliveryId)) return { status: 400, outcome: "bad-delivery-id" };
     const action = typeof hook.payload?.action === "string" ? hook.payload.action : null;
@@ -26,7 +29,7 @@ export function createWebhookHandler(pool: Pool, boss: PgBoss) {
       );
       if (inserted.rowCount === 0) return { status: 200, outcome: "duplicate" };
 
-      const outcome = await route(tx, boss, hook);
+      const outcome = await route(tx, boss, hook, accountAllowed);
       await tx.query("UPDATE webhook_deliveries SET outcome = $2 WHERE delivery_id = $1", [hook.deliveryId, outcome]);
       return { status: 202, outcome };
     });
@@ -42,7 +45,7 @@ export function createWebhookHandler(pool: Pool, boss: PgBoss) {
   };
 }
 
-async function route(tx: Tx, boss: PgBoss, hook: IncomingWebhook): Promise<string> {
+async function route(tx: Tx, boss: PgBoss, hook: IncomingWebhook, accountAllowed: AccountCheck): Promise<string> {
   const p = hook.payload;
   switch (hook.event) {
     case "ping":
@@ -52,9 +55,14 @@ async function route(tx: Tx, boss: PgBoss, hook: IncomingWebhook): Promise<strin
     case "installation_repositories":
       return handleInstallationRepositories(tx, p);
     case "pull_request":
-      return queueReview(tx, boss, p, decidePullRequest(p));
-    case "issue_comment":
-      return queueReview(tx, boss, p, decideIssueComment(p));
+    case "issue_comment": {
+      const repoOwner = p.repository?.owner?.login;
+      if (typeof repoOwner === "string" && !(await accountAllowed(repoOwner))) {
+        return "ignored:account-not-allowed";
+      }
+      const decision = hook.event === "pull_request" ? decidePullRequest(p) : decideIssueComment(p);
+      return queueReview(tx, boss, p, decision);
+    }
     default:
       return `ignored:event`;
   }

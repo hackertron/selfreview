@@ -49,7 +49,19 @@ const Env = z.object({
           .transform((p) => ({ ...p, cachedInput: p.cachedInput ?? p.input })),
       ),
     ),
-  MONTHLY_BUDGET_USD: z.coerce.number().positive().optional(),
+  // A hard monthly cap on model spend. On by default so a fresh deploy can't run up a bill.
+  MONTHLY_BUDGET_USD: z.coerce.number().positive().default(10),
+  // ---- accounts (api) ----
+  // GitHub users or orgs whose repos may be reviewed, besides the app's owner. Comma-separated.
+  // Setting it also makes a newly created GitHub App public, so those accounts can install it.
+  ALLOWED_ACCOUNTS: z
+    .string()
+    .default("")
+    .transform((text) => text.split(",").map((s) => s.trim().toLowerCase()).filter(Boolean)),
+  // ---- updates (api) ----
+  // Set by Railway for GitHub deploys. The dashboard compares it with UPDATE_REPO's main branch.
+  RAILWAY_GIT_COMMIT_SHA: z.string().optional(),
+  UPDATE_REPO: z.string().default("hackertron/selfreview"),
 });
 
 export type Config = z.infer<typeof Env>;

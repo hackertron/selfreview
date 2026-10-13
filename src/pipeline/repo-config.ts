@@ -13,6 +13,9 @@ export const RepoConfig = z.object({
   skip_authors: z.array(z.string()).default(["dependabot[bot]", "renovate[bot]"]),
   skip_labels: z.array(z.string()).default(["no-review"]),
   models: z.object({ small: z.string().optional(), large: z.string().optional() }).default({}),
+  // The "Selfreview" check fails when the review posts a finding at or above this severity, so
+  // branch protection can block the merge. "never": the check is only informational.
+  fail_on: z.enum(["never", "medium", "high"]).default("never"),
 });
 export type RepoConfig = z.infer<typeof RepoConfig>;
 

@@ -10,6 +10,7 @@ import {
   type AppCredentials,
   type ManifestConversion,
 } from "../github/app";
+import { isAllowedAccount } from "../github/accounts";
 import { verifyWebhookSignature } from "../github/signature";
 import { log } from "../log";
 import { createBoss } from "../queue";
@@ -25,6 +26,7 @@ import {
 } from "../web/tokens";
 import { createWebhookHandler, type IncomingWebhook, type WebhookResult } from "../webhooks";
 import { loadDashboard, type DashboardData } from "../web/dashboard-data";
+import { createUpdateCheck } from "../web/updates";
 import { REVIEW_QUEUE } from "../queue";
 
 export type ApiDeps = {
@@ -37,6 +39,8 @@ export type ApiDeps = {
   credentials: { get(): Promise<AppCredentials | null>; save(app: ManifestConversion): Promise<boolean> };
   exchangeManifestCode: (code: string) => Promise<ManifestConversion>;
   acceptWebhook: (hook: IncomingWebhook) => Promise<WebhookResult>;
+  /** Create the GitHub App as public (ALLOWED_ACCOUNTS lists other accounts). */
+  publicApp?: boolean;
 };
 
 const SESSION_COOKIE = "selfreview_session";
@@ -136,7 +140,8 @@ export function createApp(deps: ApiDeps) {
     const action = org
       ? `https://github.com/organizations/${encodeURIComponent(org)}/settings/apps/new?state=${state}`
       : `https://github.com/settings/apps/new?state=${state}`;
-    return c.html(pages.createAppPage(action, buildManifest(deps.publicUrl, org || undefined), org || "your personal account"));
+    const manifest = buildManifest(deps.publicUrl, org || undefined, deps.publicApp ?? false);
+    return c.html(pages.createAppPage(action, manifest, org || "your personal account"));
   });
 
   app.get("/setup/callback", async (c) => {
@@ -225,21 +230,31 @@ export async function runApi(config: Config) {
   const pool = createPool(config.DATABASE_URL);
   const boss = createBoss(config.DATABASE_URL, { supervise: false, schedule: false }); // send only
   await boss.start();
+  const credentials = new AppCredentialStore(pool, encryptionKey);
+  const accountAllowed = async (login: string) => {
+    const owner = (await credentials.get())?.owner;
+    return isAllowedAccount(login, owner, config.ALLOWED_ACCOUNTS);
+  };
+  const updates = createUpdateCheck(config.UPDATE_REPO, config.RAILWAY_GIT_COMMIT_SHA);
 
   const app = createApp({
     checkDb: async () => {
       await pool.query("SELECT 1");
     },
-    dashboard: () => loadDashboard(pool, boss, config.MONTHLY_BUDGET_USD),
+    dashboard: async () => ({
+      ...(await loadDashboard(pool, boss, config.MONTHLY_BUDGET_USD)),
+      update: await updates(),
+    }),
     retryJob: async (id) => {
       await boss.retry(REVIEW_QUEUE, id);
     },
     publicUrl: publicUrl(config),
     adminPassword,
     signingKey: deriveSigningKey(encryptionKey, adminPassword),
-    credentials: new AppCredentialStore(pool, encryptionKey),
+    credentials,
     exchangeManifestCode,
-    acceptWebhook: createWebhookHandler(pool, boss),
+    acceptWebhook: createWebhookHandler(pool, boss, accountAllowed),
+    publicApp: config.ALLOWED_ACCOUNTS.length > 0,
   });
   const server = Bun.serve({ port: config.PORT, fetch: app.fetch });
   log.info("api listening", { port: server.port, publicUrl: publicUrl(config) });

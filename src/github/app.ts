@@ -28,19 +28,24 @@ export const ManifestConversion = z.object({
 });
 export type ManifestConversion = z.infer<typeof ManifestConversion>;
 
-export function buildManifest(publicUrl: string, org?: string) {
+/**
+ * `isPublic` is true when ALLOWED_ACCOUNTS lists other accounts: a private app can only be
+ * installed on the account that owns it. Reviews for accounts not on the list are refused anyway.
+ */
+export function buildManifest(publicUrl: string, org?: string, isPublic = false) {
   return {
     // GitHub lets the person rename it on the next page; names are globally unique.
     name: org ? `selfreview-${org}`.slice(0, 34) : "selfreview",
     url: publicUrl,
     hook_attributes: { url: `${publicUrl}/webhooks/github`, active: true },
     redirect_url: `${publicUrl}/setup/callback`,
-    public: false, // installable only on the owning account (that's why setup asks which one)
+    public: isPublic,
     default_permissions: {
       pull_requests: "write", // read diffs, post reviews and comments
       contents: "read", // read files and .selfreview.yml
       metadata: "read", // required by GitHub for every app
       issues: "read", // receive /selfreview comments
+      checks: "write", // the "Selfreview" check on each commit
     },
     default_events: ["pull_request", "issue_comment"],
   };

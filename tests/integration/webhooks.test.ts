@@ -103,4 +103,15 @@ describe.skipIf(!url)("webhook intake against Postgres", () => {
     const { rows } = await pool.query("SELECT removed_at FROM installations WHERE id = $1", [INSTALLATION]);
     expect(rows[0].removed_at).not.toBeNull();
   });
+
+  test("a PR from an account that isn't allowed is recorded but never queued", async () => {
+    const strict = createWebhookHandler(pool, boss, async () => false);
+    const res = await strict(hook("pull_request", prPayload("opened", 99)));
+    expect(res.outcome).toBe("ignored:account-not-allowed");
+    const { rows } = await pool.query(
+      `SELECT 1 FROM pgboss.job WHERE name = $1 AND data->>'repo' = $2 AND (data->>'pr')::int = 99`,
+      [REVIEW_QUEUE, REPO],
+    );
+    expect(rows.length).toBe(0);
+  });
 });
